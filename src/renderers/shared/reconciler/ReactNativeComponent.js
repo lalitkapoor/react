@@ -58,6 +58,9 @@ function getComponentClassForElement(element) {
   if (componentClass == null) {
     tagToComponentClass[tag] = componentClass = autoGenerateWrapperClass(tag);
   }
+  // console.log(tagToComponentClass)
+  console.log('LOOKING FOR', tag)
+  // console.log(tagToComponentClass[tag])
   return componentClass;
 }
 

@@ -115,7 +115,8 @@ var ReactCompositeComponentMixin = {
    * @final
    * @internal
    */
-  mountComponent: function(rootID, transaction, context) {
+  mountComponent: function(rootID, transaction, context, done) {
+    var self = this;
     this._context = context;
     this._mountOrder = nextMountID++;
     this._rootNodeID = rootID;
@@ -128,6 +129,7 @@ var ReactCompositeComponentMixin = {
     );
 
     // Initialize the public class
+    console.log('CREATING CLASS')
     var inst = new Component(publicProps, publicContext);
 
     if (__DEV__) {
@@ -225,24 +227,40 @@ var ReactCompositeComponentMixin = {
       }
     }
 
-    var renderedElement = this._renderValidatedComponent();
+    console.log('not yet rendered')
 
-    this._renderedComponent = this._instantiateReactComponent(
-      renderedElement,
-      this._currentElement.type // The wrapping type
-    );
+    var waitForMe = this._instance.waitForMe || function(cb){cb()};
 
-    var markup = ReactReconciler.mountComponent(
-      this._renderedComponent,
-      rootID,
-      transaction,
-      this._processChildContext(context)
-    );
-    if (inst.componentDidMount) {
-      transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
-    }
+    return waitForMe(function() {
+      if (self._pendingStateQueue) {
+        inst.state = self._processPendingState(inst.props, inst.context);
+      }
+      var renderedElement = self._renderValidatedComponent();
+      console.log('rendered')
 
-    return markup;
+      self._renderedComponent = self._instantiateReactComponent(
+        renderedElement,
+        self._currentElement.type // The wrapping type
+      );
+
+      console.log('-------------------------------------')
+
+      console.log('rcc calling rr to mount')
+      ReactReconciler.mountComponent(
+        self._renderedComponent,
+        rootID,
+        transaction,
+        self._processChildContext(context),
+        function(error, markup) {
+          if (inst.componentDidMount) {
+            transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
+          }
+
+          console.log('rcc', markup)
+          return done(null, markup);
+        }
+      );
+    })
   },
 
   /**

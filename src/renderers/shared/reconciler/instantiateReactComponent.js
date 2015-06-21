@@ -82,24 +82,31 @@ function instantiateReactComponent(node, parentCompositeType) {
       getDeclarationErrorAddendum(element._owner)
     );
 
+    console.log('ELEMENT', element.type.displayName)
+    // console.log(element)
     // Special case string values
     if (parentCompositeType === element.type &&
         typeof element.type === 'string') {
+      console.log('HERE 1')
       // Avoid recursion if the wrapper renders itself.
       instance = ReactNativeComponent.createInternalComponent(element);
       // All native components are currently wrapped in a composite so we're
       // safe to assume that this is what we should instantiate.
     } else if (isInternalComponentType(element.type)) {
+      console.log('HERE 2')
       // This is temporarily available for custom components that are not string
       // represenations. I.e. ART. Once those are updated to use the string
       // representation, we can drop this code path.
       instance = new element.type(element);
     } else {
+      console.log('HERE 3')
       instance = new ReactCompositeComponentWrapper();
     }
   } else if (typeof node === 'string' || typeof node === 'number') {
+    console.log('HERE 4')
     instance = ReactNativeComponent.createInstanceForText(node);
   } else {
+    console.log('HERE 5')
     invariant(
       false,
       'Encountered invalid React node of type %s',
@@ -118,6 +125,7 @@ function instantiateReactComponent(node, parentCompositeType) {
   }
 
   // Sets up the instance. This can probably just move into the constructor now.
+  console.log(instance)
   instance.construct(node);
 
   // These two fields are used by the DOM and ART diffing algorithms

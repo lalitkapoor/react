@@ -65,7 +65,7 @@ assign(ReactDOMTextComponent.prototype, {
    * @return {string} Markup for this text node.
    * @internal
    */
-  mountComponent: function(rootID, transaction, context) {
+  mountComponent: function(rootID, transaction, context, done) {
     if (__DEV__) {
       if (context[validateDOMNesting.ancestorInfoContextKey]) {
         validateDOMNesting(
@@ -86,11 +86,11 @@ assign(ReactDOMTextComponent.prototype, {
       return escapedText;
     }
 
-    return (
+    return done(null, (
       '<span ' + DOMPropertyOperations.createMarkupForID(rootID) + '>' +
         escapedText +
       '</span>'
-    );
+    ));
   },
 
   /**

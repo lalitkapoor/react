@@ -12,7 +12,7 @@
 'use strict';
 
 var ReactRef = require('ReactRef');
-
+var called = 0
 /**
  * Helper to call ReactRef.attachRefs with this composite component, split out
  * to avoid allocations in the transaction mount-ready queue.
@@ -33,12 +33,14 @@ var ReactReconciler = {
    * @final
    * @internal
    */
-  mountComponent: function(internalInstance, rootID, transaction, context) {
-    var markup = internalInstance.mountComponent(rootID, transaction, context);
-    if (internalInstance._currentElement.ref != null) {
-      transaction.getReactMountReady().enqueue(attachRefs, internalInstance);
-    }
-    return markup;
+  mountComponent: function(internalInstance, rootID, transaction, context, done) {
+    internalInstance.mountComponent(rootID, transaction, context, function(error, markup) {
+      if (internalInstance._currentElement.ref != null) {
+        transaction.getReactMountReady().enqueue(attachRefs, internalInstance);
+      }
+      console.log('rr', markup)
+      return done(null, markup)
+    });
   },
 
   /**

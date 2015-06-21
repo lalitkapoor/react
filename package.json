@@ -25,6 +25,7 @@
     "url": "https://github.com/facebook/react"
   },
   "dependencies": {
+    "async": "^1.2.1",
     "commoner": "^0.10.0",
     "jstransform": "^11.0.0"
   },

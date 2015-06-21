@@ -17,6 +17,7 @@ var ReactMultiChildUpdateTypes = require('ReactMultiChildUpdateTypes');
 
 var ReactReconciler = require('ReactReconciler');
 var ReactChildReconciler = require('ReactChildReconciler');
+var async = require('async');
 
 /**
  * Updating children of a component may trigger recursive updates. The depth is
@@ -177,29 +178,63 @@ var ReactMultiChild = {
      * @return {array} An array of mounted representations.
      * @internal
      */
-    mountChildren: function(nestedChildren, transaction, context) {
+    // mountChildren: function(nestedChildren, transaction, context) {
+    //   var children = ReactChildReconciler.instantiateChildren(
+    //     nestedChildren, transaction, context
+    //   );
+    //   this._renderedChildren = children;
+    //   var mountImages = [];
+    //   var index = 0;
+    //   for (var name in children) {
+    //     if (children.hasOwnProperty(name)) {
+    //       var child = children[name];
+    //       // Inlined for performance, see `ReactInstanceHandles.createReactID`.
+    //       var rootID = this._rootNodeID + name;
+    //       var mountImage = ReactReconciler.mountComponent(
+    //         child,
+    //         rootID,
+    //         transaction,
+    //         context
+    //       );
+    //       child._mountIndex = index;
+    //       mountImages.push(mountImage);
+    //       index++;
+    //     }
+    //   }
+    //   return mountImages;
+    // },
+    mountChildren: function(nestedChildren, transaction, context, done) {
+      var self = this
+
       var children = ReactChildReconciler.instantiateChildren(
         nestedChildren, transaction, context
       );
       this._renderedChildren = children;
       var mountImages = [];
-      var index = 0;
-      for (var name in children) {
-        if (children.hasOwnProperty(name)) {
-          var child = children[name];
-          // Inlined for performance, see `ReactInstanceHandles.createReactID`.
-          var rootID = this._rootNodeID + name;
-          var mountImage = ReactReconciler.mountComponent(
-            child,
-            rootID,
-            transaction,
-            context
-          );
-          child._mountIndex = index;
-          mountImages.push(mountImage);
-          index++;
-        }
-      }
+      var keys = Object.keys(children)
+
+      async.map(keys, function(name, callback) {
+        var child = children[name];
+
+        // Inlined for performance, see `ReactInstanceHandles.createReactID`.
+        var rootID = self._rootNodeID + name;
+        return ReactReconciler.mountComponent(
+          child,
+          rootID,
+          transaction,
+          context,
+          callback
+        );
+      }, function(error, results) {
+        if (error) return done(error)
+
+        keys.forEach(function(name, index) {
+          var child = children[name]
+          child._mountIndex = index
+          mountImages.push(results[index])
+        })
+        done(null, mountImages)
+      })
       return mountImages;
     },
 
