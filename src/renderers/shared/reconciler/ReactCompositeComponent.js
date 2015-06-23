@@ -221,7 +221,7 @@ var ReactCompositeComponentMixin = {
     // console.log('not yet rendered')
 
     var noop = function(){}
-    var waitForMe = this._instance.waitForMe || function(cb){cb()};
+    var getInitialData = this._instance.getInitialData || function(cb){cb()};
 
     var onwards = function() {
       // call getInitialState again, because we have now loaded in the data
@@ -268,12 +268,12 @@ var ReactCompositeComponentMixin = {
     }
     // client side
     if(typeof(window) !== 'undefined') {
-      waitForMe(noop)
+      getInitialData(noop)
       onwards()
       return
     }
 
-    return waitForMe(onwards)
+    return getInitialData(onwards)
   },
 
   /**
