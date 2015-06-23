@@ -262,7 +262,8 @@ function mountComponentIntoNode(
     container,
     transaction,
     shouldReuseMarkup,
-    context) {
+    context,
+    done) {
   if (__DEV__) {
     if (context === emptyObject) {
       context = {};
@@ -272,10 +273,13 @@ function mountComponentIntoNode(
       validateDOMNesting.updatedAncestorInfo(null, tag, null);
   }
   var markup = ReactReconciler.mountComponent(
-    componentInstance, rootID, transaction, context
+    componentInstance, rootID, transaction, context, function(error, markup) {
+      if (error) throw error
+      componentInstance._isTopLevel = true;
+      ReactMount._mountImageIntoNode(markup, container, shouldReuseMarkup);
+      return done();
+    }
   );
-  componentInstance._isTopLevel = true;
-  ReactMount._mountImageIntoNode(markup, container, shouldReuseMarkup);
 }
 
 /**
@@ -293,17 +297,19 @@ function batchedMountComponentIntoNode(
     shouldReuseMarkup,
     context) {
   var transaction = ReactUpdates.ReactReconcileTransaction.getPooled();
-  transaction.perform(
-    mountComponentIntoNode,
-    null,
-    componentInstance,
-    rootID,
-    container,
-    transaction,
-    shouldReuseMarkup,
-    context
-  );
-  ReactUpdates.ReactReconcileTransaction.release(transaction);
+  transaction.perform(function() {
+    mountComponentIntoNode(
+      componentInstance,
+      rootID,
+      container,
+      transaction,
+      shouldReuseMarkup,
+      context,
+      function() {
+        setTimeout(function(){ReactUpdates.ReactReconcileTransaction.release(transaction);}, 0)
+      }
+    );
+  });
 }
 
 /**
@@ -425,7 +431,8 @@ var ReactMount = {
     nextElement,
     container,
     shouldReuseMarkup,
-    context
+    context,
+    done
   ) {
     // Various parts of our code (such as ReactCompositeComponent's
     // _renderValidatedComponent) assume that calls to render aren't nested;
@@ -450,22 +457,24 @@ var ReactMount = {
     // rendering, in componentWillMount or componentDidMount, will be batched
     // according to the current batching strategy.
 
-    ReactUpdates.batchedUpdates(
-      batchedMountComponentIntoNode,
-      componentInstance,
-      reactRootID,
-      container,
-      shouldReuseMarkup,
-      context
-    );
+    ReactUpdates.batchedUpdates(function() {
+      batchedMountComponentIntoNode(
+        componentInstance,
+        reactRootID,
+        container,
+        shouldReuseMarkup,
+        context,
+        function() {
+          if (__DEV__) {
+            // Record the root element in case it later gets transplanted.
+            rootElementsByReactRootID[reactRootID] =
+              getReactRootElementInContainer(container);
+          }
 
-    if (__DEV__) {
-      // Record the root element in case it later gets transplanted.
-      rootElementsByReactRootID[reactRootID] =
-        getReactRootElementInContainer(container);
-    }
-
-    return componentInstance;
+          done(null, componentInstance);
+        }
+      )
+    })
   },
 
   /**
@@ -562,7 +571,7 @@ var ReactMount = {
     }
 
     var shouldReuseMarkup = containerHasReactMarkup && !prevComponent;
-    var component = ReactMount._renderNewRootComponent(
+    ReactMount._renderNewRootComponent(
       nextElement,
       container,
       shouldReuseMarkup,
@@ -570,12 +579,14 @@ var ReactMount = {
         parentComponent._reactInternalInstance._processChildContext(
           parentComponent._reactInternalInstance._context
         ) :
-        emptyObject
-    ).getPublicInstance();
-    if (callback) {
-      callback.call(component);
-    }
-    return component;
+        emptyObject,
+      function(error, component) {
+        component.getPublicInstance();
+        if (callback) {
+          callback.call(component);
+        }
+      }
+    )
   },
 
 

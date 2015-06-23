@@ -38,7 +38,7 @@ var ReactReconciler = {
       if (internalInstance._currentElement.ref != null) {
         transaction.getReactMountReady().enqueue(attachRefs, internalInstance);
       }
-      console.log('rr', markup)
+      // console.log('rr', markup)
       return done(null, markup)
     });
   },

@@ -25,11 +25,11 @@
     "url": "https://github.com/facebook/react"
   },
   "dependencies": {
-    "async": "^1.2.1",
     "commoner": "^0.10.0",
     "jstransform": "^11.0.0"
   },
   "devDependencies": {
+    "async": "^1.2.1",
     "babel": "^5.5.5",
     "babel-eslint": "^3.1.14",
     "benchmark": "~1.0.0",

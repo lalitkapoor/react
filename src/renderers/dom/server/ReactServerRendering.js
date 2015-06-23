@@ -43,7 +43,7 @@ function renderToString(element, done) {
 
   var componentInstance = instantiateReactComponent(element, null);
   var markup = componentInstance.mountComponent(id, transaction, emptyObject, function(error, markup) {
-    console.log('rsr', markup)
+    // console.log('rsr', markup)
     return transaction.perform(function() {
       var markupWithChecksum = ReactMarkupChecksum.addChecksumToMarkup(markup);
       ReactServerRenderingTransaction.release(transaction);
