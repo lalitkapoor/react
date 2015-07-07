@@ -28,31 +28,32 @@ var invariant = require('invariant');
  * @param {ReactElement} element
  * @return {string} the HTML markup
  */
-function renderToString(element) {
+function renderToString(element, done) {
   invariant(
     ReactElement.isValidElement(element),
     'renderToString(): You must pass a valid ReactElement.'
   );
 
   var transaction;
-  try {
-    ReactUpdates.injection.injectBatchingStrategy(ReactServerBatchingStrategy);
 
-    var id = ReactInstanceHandles.createReactRootID();
-    transaction = ReactServerRenderingTransaction.getPooled(false);
+  ReactUpdates.injection.injectBatchingStrategy(ReactServerBatchingStrategy);
 
+  var id = ReactInstanceHandles.createReactRootID();
+  transaction = ReactServerRenderingTransaction.getPooled(false);
+
+  var componentInstance = instantiateReactComponent(element, null);
+  var markup = componentInstance.mountComponent(id, transaction, emptyObject, function(error, markup) {
+    // console.log('rsr', markup)
     return transaction.perform(function() {
-      var componentInstance = instantiateReactComponent(element, null);
-      var markup =
-        componentInstance.mountComponent(id, transaction, emptyObject);
-      return ReactMarkupChecksum.addChecksumToMarkup(markup);
-    }, null);
-  } finally {
-    ReactServerRenderingTransaction.release(transaction);
-    // Revert to the DOM batching strategy since these two renderers
-    // currently share these stateful modules.
-    ReactUpdates.injection.injectBatchingStrategy(ReactDefaultBatchingStrategy);
-  }
+      var markupWithChecksum = ReactMarkupChecksum.addChecksumToMarkup(markup);
+      ReactServerRenderingTransaction.release(transaction);
+      // Revert to the DOM batching strategy since these two renderers
+      // currently share these stateful modules.
+      ReactUpdates.injection.injectBatchingStrategy(ReactDefaultBatchingStrategy);
+      done(null, markupWithChecksum)
+  }, null);
+
+  });
 }
 
 /**

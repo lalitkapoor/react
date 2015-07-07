@@ -347,7 +347,8 @@ ReactDOMComponent.Mixin = {
    * @param {object} context
    * @return {string} The computed markup.
    */
-  mountComponent: function(rootID, transaction, context) {
+  mountComponent: function(rootID, transaction, context, done) {
+    var self = this;
     this._rootNodeID = rootID;
 
     var props = this._currentElement.props;
@@ -395,26 +396,27 @@ ReactDOMComponent.Mixin = {
     }
 
     var tagOpen = this._createOpenTagMarkupAndPutListeners(transaction, props);
-    var tagContent = this._createContentMarkup(transaction, props, context);
+    this._createContentMarkup(transaction, props, context, function(error, tagContent) {
+      if (error) return done(error)
+      switch (self._tag) {
+        case 'button':
+        case 'input':
+        case 'select':
+        case 'textarea':
+          if (props.autoFocus) {
+            transaction.getReactMountReady().enqueue(
+              AutoFocusUtils.focusDOMComponent,
+              self
+            );
+          }
+          break;
+      }
 
-    switch (this._tag) {
-      case 'button':
-      case 'input':
-      case 'select':
-      case 'textarea':
-        if (props.autoFocus) {
-          transaction.getReactMountReady().enqueue(
-            AutoFocusUtils.focusDOMComponent,
-            this
-          );
-        }
-        break;
-    }
-
-    if (!tagContent && omittedCloseTags[this._tag]) {
-      return tagOpen + '/>';
-    }
-    return tagOpen + '>' + tagContent + '</' + this._tag + '>';
+      if (!tagContent && omittedCloseTags[self._tag]) {
+        return done(null, tagOpen + '/>');
+      }
+      return done(null, tagOpen + '>' + tagContent + '</' + self._tag + '>');
+    });
   },
 
   /**
@@ -485,8 +487,11 @@ ReactDOMComponent.Mixin = {
    * @param {object} context
    * @return {string} Content markup.
    */
-  _createContentMarkup: function(transaction, props, context) {
+  _createContentMarkup: function(transaction, props, context, done) {
+    var self = this;
     var ret = '';
+
+    var processChildren = false;
 
     // Intentional use of != to avoid catching zero/false.
     var innerHTML = props.dangerouslySetInnerHTML;
@@ -502,28 +507,41 @@ ReactDOMComponent.Mixin = {
         // TODO: Validate that text is allowed as a child of this node
         ret = escapeTextContentForBrowser(contentToUse);
       } else if (childrenToUse != null) {
-        var mountImages = this.mountChildren(
-          childrenToUse,
-          transaction,
-          processChildContext(context, this)
-        );
-        ret = mountImages.join('');
+        processChildren = true;
       }
     }
-    if (newlineEatingTags[this._tag] && ret.charAt(0) === '\n') {
-      // text/html ignores the first character in these tags if it's a newline
-      // Prefer to break application/xml over text/html (for now) by adding
-      // a newline specifically to get eaten by the parser. (Alternately for
-      // textareas, replacing "^\n" with "\r\n" doesn't get eaten, and the first
-      // \r is normalized out by HTMLTextAreaElement#value.)
-      // See: <http://www.w3.org/TR/html-polyglot/#newlines-in-textarea-and-pre>
-      // See: <http://www.w3.org/TR/html5/syntax.html#element-restrictions>
-      // See: <http://www.w3.org/TR/html5/syntax.html#newlines>
-      // See: Parsing of "textarea" "listing" and "pre" elements
-      //  from <http://www.w3.org/TR/html5/syntax.html#parsing-main-inbody>
-      return '\n' + ret;
+
+    var tidy = function(ret) {
+      if (newlineEatingTags[self._tag] && ret.charAt(0) === '\n') {
+        // text/html ignores the first character in these tags if it's a newline
+        // Prefer to break application/xml over text/html (for now) by adding
+        // a newline specifically to get eaten by the parser. (Alternately for
+        // textareas, replacing "^\n" with "\r\n" doesn't get eaten, and the first
+        // \r is normalized out by HTMLTextAreaElement#value.)
+        // See: <http://www.w3.org/TR/html-polyglot/#newlines-in-textarea-and-pre>
+        // See: <http://www.w3.org/TR/html5/syntax.html#element-restrictions>
+        // See: <http://www.w3.org/TR/html5/syntax.html#newlines>
+        // See: Parsing of "textarea" "listing" and "pre" elements
+        //  from <http://www.w3.org/TR/html5/syntax.html#parsing-main-inbody>
+        return '\n' + ret;
+      } else {
+        return ret;
+      }
+    }
+
+    if (processChildren) {
+      this.mountChildren(
+        childrenToUse,
+        transaction,
+        processChildContext(context, this),
+        function(error, markup) {
+          if (error) return done(error)
+          ret = markup.join('');
+          return done(null, tidy(ret));
+        }
+      );
     } else {
-      return ret;
+      return done(null, tidy(ret));
     }
   },
 

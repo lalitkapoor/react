@@ -115,7 +115,8 @@ var ReactCompositeComponentMixin = {
    * @final
    * @internal
    */
-  mountComponent: function(rootID, transaction, context) {
+  mountComponent: function(rootID, transaction, context, done) {
+    var self = this;
     this._context = context;
     this._mountOrder = nextMountID++;
     this._rootNodeID = rootID;
@@ -128,6 +129,7 @@ var ReactCompositeComponentMixin = {
     );
 
     // Initialize the public class
+    // console.log('CREATING CLASS')
     var inst = new Component(publicProps, publicContext);
 
     if (__DEV__) {
@@ -216,33 +218,62 @@ var ReactCompositeComponentMixin = {
     this._pendingReplaceState = false;
     this._pendingForceUpdate = false;
 
-    if (inst.componentWillMount) {
-      inst.componentWillMount();
-      // When mounting, calls to `setState` by `componentWillMount` will set
-      // `this._pendingStateQueue` without triggering a re-render.
-      if (this._pendingStateQueue) {
-        inst.state = this._processPendingState(inst.props, inst.context);
+    // console.log('not yet rendered')
+
+    var noop = function(){}
+    var getInitialData = this._instance.getInitialData || function(cb){cb()};
+
+    var onwards = function() {
+      // call getInitialState again, because we have now loaded in the data
+      if(inst.getInitialState) {
+        inst.state = inst.getInitialState()
       }
+      if (inst.componentWillMount) {
+        inst.componentWillMount();
+        // When mounting, calls to `setState` by `componentWillMount` will set
+        // `this._pendingStateQueue` without triggering a re-render.
+        if (self._pendingStateQueue) {
+          inst.state = self._processPendingState(inst.props, inst.context);
+        }
+      }
+
+      if (self._pendingStateQueue) {
+        inst.state = self._processPendingState(inst.props, inst.context);
+      }
+      var renderedElement = self._renderValidatedComponent();
+      // console.log('rendered')
+
+      self._renderedComponent = self._instantiateReactComponent(
+        renderedElement,
+        self._currentElement.type // The wrapping type
+      );
+
+      // console.log('-------------------------------------')
+
+      // console.log('rcc calling rr to mount')
+      ReactReconciler.mountComponent(
+        self._renderedComponent,
+        rootID,
+        transaction,
+        self._processChildContext(context),
+        function(error, markup) {
+          if (inst.componentDidMount) {
+            transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
+          }
+
+          // console.log('rcc', markup)
+          return done(null, markup);
+        }
+      );
+    }
+    // client side
+    if(typeof(window) !== 'undefined') {
+      getInitialData(noop)
+      onwards()
+      return
     }
 
-    var renderedElement = this._renderValidatedComponent();
-
-    this._renderedComponent = this._instantiateReactComponent(
-      renderedElement,
-      this._currentElement.type // The wrapping type
-    );
-
-    var markup = ReactReconciler.mountComponent(
-      this._renderedComponent,
-      rootID,
-      transaction,
-      this._processChildContext(context)
-    );
-    if (inst.componentDidMount) {
-      transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
-    }
-
-    return markup;
+    return getInitialData(onwards)
   },
 
   /**
@@ -671,6 +702,7 @@ var ReactCompositeComponentMixin = {
    * @internal
    */
   _updateRenderedComponent: function(transaction, context) {
+    var self = this;
     var prevComponentInstance = this._renderedComponent;
     var prevRenderedElement = prevComponentInstance._currentElement;
     var nextRenderedElement = this._renderValidatedComponent();
@@ -691,13 +723,16 @@ var ReactCompositeComponentMixin = {
         nextRenderedElement,
         this._currentElement.type
       );
-      var nextMarkup = ReactReconciler.mountComponent(
+      ReactReconciler.mountComponent(
         this._renderedComponent,
         thisID,
         transaction,
-        this._processChildContext(context)
+        this._processChildContext(context),
+        function(error, nextMarkup) {
+          self._replaceNodeWithMarkupByID(prevComponentID, nextMarkup);
+        }
       );
-      this._replaceNodeWithMarkupByID(prevComponentID, nextMarkup);
+
     }
   },
 
