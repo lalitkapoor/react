@@ -702,6 +702,7 @@ var ReactCompositeComponentMixin = {
    * @internal
    */
   _updateRenderedComponent: function(transaction, context) {
+    var self = this;
     var prevComponentInstance = this._renderedComponent;
     var prevRenderedElement = prevComponentInstance._currentElement;
     var nextRenderedElement = this._renderValidatedComponent();
@@ -722,13 +723,16 @@ var ReactCompositeComponentMixin = {
         nextRenderedElement,
         this._currentElement.type
       );
-      var nextMarkup = ReactReconciler.mountComponent(
+      ReactReconciler.mountComponent(
         this._renderedComponent,
         thisID,
         transaction,
-        this._processChildContext(context)
+        this._processChildContext(context),
+        function(error, nextMarkup) {
+          self._replaceNodeWithMarkupByID(prevComponentID, nextMarkup);
+        }
       );
-      this._replaceNodeWithMarkupByID(prevComponentID, nextMarkup);
+
     }
   },
 
