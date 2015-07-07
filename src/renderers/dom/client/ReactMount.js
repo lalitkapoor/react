@@ -306,7 +306,17 @@ function batchedMountComponentIntoNode(
       shouldReuseMarkup,
       context,
       function() {
-        setTimeout(function(){ReactUpdates.ReactReconcileTransaction.release(transaction);}, 0)
+
+        // server side
+        if (typeof(window) === 'undefined') {
+          return process.nextTick(function() {
+            ReactUpdates.ReactReconcileTransaction.release(transaction);
+          });
+        }
+
+        setTimeout(function() {
+          ReactUpdates.ReactReconcileTransaction.release(transaction);
+        }, 0);
       }
     );
   });
